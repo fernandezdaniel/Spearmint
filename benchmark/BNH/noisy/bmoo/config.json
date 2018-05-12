@@ -1,0 +1,58 @@
+{
+    "language"        : "PYTHON",
+    "random_seed"     : 1,
+    "main_file"       : "BNH",
+    "grid_size"       : 1000,
+    "delta" : 		0.05,
+    "max_finished_jobs"       : 100,
+    "experiment-name" : "BNH_bmoo_noisy",
+    "moo_use_grid_only_to_solve_problem"      : true,
+    "moo_grid_size_to_solve_problem" : 1000,
+    "likelihood"      : "GAUSSIAN",
+    "acquisition"     : "BMOO",
+    "obj_low_border"	: 0,
+    "obj_high_border"   : 140,
+    "con_low_border"    : -5.2,
+    "con_high_border"    : 1,
+    "variables": {
+        "X": {
+            "type": "FLOAT",
+            "size": 1,
+            "min":  0,
+            "max":  5
+        },
+        "Y": {
+            "type": "FLOAT",
+            "size": 1,
+            "min":  0,
+            "max":  3
+        }
+    },
+    "tasks": {
+      "o1" : {
+          "type"        : "OBJECTIVE",
+	  "fit_mean"    : false,
+          "transformations"     : [],
+	  "group"    : 0
+      },
+      "o2" : {
+          "type"        : "OBJECTIVE",
+	  "fit_mean"    : false,
+          "transformations"     : [],
+	  "group"    : 0
+      },
+      "c1" : {
+        "type" : "constraint",
+        "transformations" : [],
+        "fit_mean" : false,
+        "group"  : 0
+      },
+      "c2" : {
+        "type" : "constraint",
+        "transformations" : [],
+        "fit_mean" : false,
+        "group"  : 0
+      }
+    }
+}
+

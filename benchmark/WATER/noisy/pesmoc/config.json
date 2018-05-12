@@ -1,0 +1,110 @@
+{
+    "language"        : "PYTHON",
+    "random_seed"     : 1,
+    "main_file"       : "WATER",
+    "grid_size"       : 1000,
+    "delta" : 		0.05,
+    "max_finished_jobs"       : 100,
+    "experiment-name" : "WATER_pesmoc_noisy",
+    "moo_use_grid_only_to_solve_problem"      : true,
+    "moo_grid_size_to_solve_problem" : 1000,
+    "pesm_use_grid_only_to_solve_problem" : true,
+    "likelihood"      : "GAUSSIAN",
+    "acquisition"     : "PESMC",
+    "pesm_pareto_set_size" : 50,
+    "variables": {
+	"X": {
+            "type": "FLOAT",
+            "size": 1,
+            "min":  0.01,
+            "max":  0.45
+        },
+        "Y": {
+            "type": "FLOAT",
+            "size": 1,
+            "min":  0.01,
+            "max":  0.1
+        },
+        "Z": {
+            "type": "FLOAT",
+            "size": 1,
+            "min":  0.01,
+            "max":  0.1
+        }
+    },
+    "tasks": {
+      "o1" : {
+          "type"        : "OBJECTIVE",
+          "fit_mean"    : false,
+          "transformations"     : [],
+          "group"    : 0
+      },
+      "o2" : {
+          "type"        : "OBJECTIVE",
+          "fit_mean"    : false,
+          "transformations"     : [],
+          "group"    : 0
+      },
+      "o3" : {
+          "type"        : "OBJECTIVE",
+          "fit_mean"    : false,
+          "transformations"     : [],
+          "group"    : 0
+      },
+      "o4" : {
+          "type"        : "OBJECTIVE",
+          "fit_mean"    : false,
+          "transformations"     : [],
+          "group"    : 0
+      },
+      "o5" : {
+          "type"        : "OBJECTIVE",
+          "fit_mean"    : false,
+          "transformations"     : [],
+          "group"    : 0
+      },
+      "c1" : { 
+	"type" : "constraint",
+	"transformations" : [], 
+	"fit_mean" : false,
+        "group"  : 0 
+      },
+      "c2" : {
+        "type" : "constraint",
+        "transformations" : [],
+        "fit_mean" : false,
+        "group"  : 0
+      },
+      "c3" : {
+        "type" : "constraint",
+        "transformations" : [],
+        "fit_mean" : false,
+        "group"  : 0
+      },
+      "c4" : {
+        "type" : "constraint",
+        "transformations" : [],
+        "fit_mean" : false,
+        "group"  : 0
+      },
+      "c5" : {
+        "type" : "constraint",
+        "transformations" : [],
+        "fit_mean" : false,
+        "group"  : 0
+      },
+      "c6" : {
+        "type" : "constraint",
+        "transformations" : [],
+        "fit_mean" : false,
+        "group"  : 0
+      },
+      "c7" : {
+        "type" : "constraint",
+        "transformations" : [],
+        "fit_mean" : false,
+        "group"  : 0
+      }
+    }
+}
+
