@@ -40,6 +40,7 @@ This branch also includes the method in
 
     Dealing with Categorical and Integer-valued Variables in Bayesian Optimization with Gaussian Processes
     EC Garrido-Merchán, D Hernández-Lobato - arXiv preprint arXiv:1805.03463, 2018
+    
     Predictive Entropy Search for Multi-objective Bayesian Optimization with Constraints
     EC Garrido-Merchán, D Hernández-Lobato - arXiv preprint arXiv:1609.01051, 2016
 
