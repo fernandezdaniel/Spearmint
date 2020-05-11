@@ -56,10 +56,10 @@ def main(expt_dir):
 		print 'Only python programs supported!'
 		return -1
 
-	for task in tasks:
-		if tasks[ task ].type != 'objective':
-			print 'Not a multi-objective problem!'
-			return -1
+#	for task in tasks:
+#		if tasks[ task ].type != 'objective':
+#			print 'Not a multi-objective problem!'
+#			return -1
 
 	def create_fun(task):
 		def fun(params, gradient = False):
