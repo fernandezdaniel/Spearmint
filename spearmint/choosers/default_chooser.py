@@ -221,6 +221,7 @@ CHOOSER_OPTION_DEFAULTS  = {
     'optimize_best'  : True,
     'optimize_acq'   : True,
     'regenerate_grid': True,  # whether to pick a new sobol grid every time.. grid_seed is ignored if this is True
+    'moo_const_C_value' : 0, # C value to add to zero when checking that a constraint is larger than 0
     'use_sobol_grid_for_mo_optimization' : True, # whether to use a sobol or uniform grid.
     'seed_for_uniform_grid' : 1 # If sobol is not used, select the seed for the grid.
     }
@@ -512,7 +513,10 @@ class DefaultChooser(object):
 	    suggestion = suggestion.flatten()
 
             if len(set(task_couplings.values())) > 1: # if decoupled
-                return suggestion, [random.choice(task_names)]
+                task_groups = defaultdict(list)
+                for task_name, group in task_couplings.iteritems():
+                    task_groups[group].append(task_name)
+                return suggestion, task_groups[ random.choice(task_groups.keys()) ]
             else:  # if not decoupled. this is a bit of a hack but w/e
                 return suggestion, task_names
 	
@@ -528,12 +532,20 @@ class DefaultChooser(object):
 			logging.info("\nSuggestion:     ")
 			self.input_space.paramify_and_print(suggestion.flatten(), left_indent=16)
 
-			choice = int(np.where(np.array(map(lambda t: t._inputs.shape[0], self.tasks.values())) < 1)[ 0 ][ 0 ])
-
 	    		suggestion = suggestion.flatten()
 
 			if len(set(task_couplings.values())) > 1: # if decoupled
-				return suggestion, [ task_names[ choice ] ]
+                                task_groups = defaultdict(list)
+                                task_groups_labels = defaultdict(list)
+                                for task_name, group in task_couplings.iteritems():
+                                        task_groups[group].append(self.tasks[task_name])
+                                        task_groups_labels[group].append(task_name)
+
+			        choice = int(np.where(np.array(map(lambda g: \
+                                    np.min(map(lambda t: t._inputs.shape[0], g)), \
+                                    task_groups.values())) < 1)[ 0 ][ 0 ])
+
+                                return suggestion, task_groups_labels[ task_groups_labels.keys()[ choice ] ]
 			else:  # if not decoupled. this is a bit of a hack but w/e
 				return suggestion, task_names
 	
@@ -823,11 +835,11 @@ class DefaultChooser(object):
                 bounds = [(0,1)]*self.num_dims
                 x_opt, y_opt, opt_info = spo.fmin_l_bfgs_b(f, best_acq_location.copy(), 
                     bounds=bounds, disp=0, approx_grad=not acq.has_gradients)
-#		import pdb; pdb.set_trace();
                 y_opt = -y_opt
                 # make sure bounds are respected
                 x_opt[x_opt > 1.0] = 1.0
                 x_opt[x_opt < 0.0] = 0.0
+
 
                 if y_opt > best_grid_acq_value:
                     best_acq_location = x_opt
@@ -842,9 +854,8 @@ class DefaultChooser(object):
             # do not optimize the acqusition function
             logging.debug('Best %s on grid: %f' % (acq_name, best_grid_acq_value))
 
-	#import pdb; pdb.set_trace();
     	#self.print_frontier()
-        #self.print_images_2d()
+#        self.print_images_2d()
 
         return {"location" : best_acq_location, "value" : best_acq_value}
 
@@ -869,18 +880,17 @@ class DefaultChooser(object):
 
     # Returns a boolean array of size pred.shape[0] indicating whether the prob con-constraint is satisfied there
 
-    def probabilistic_constraint_over_hypers(self, pred, factor = 1.0):
+    def probabilistic_constraint_over_hypers(self, pred, factor = 1.0, C = 0):
         return reduce(np.logical_and, 
-            [ constraint_confidence_over_hypers(self.models[c], pred) >= (1.0-self.tasks[c].options['delta']) * factor
+            [ constraint_confidence_over_hypers(self.models[c], pred, C = C) >= (1.0-self.tasks[c].options['delta']) * factor
                 for c in self.constraints ], 
                 np.ones(pred.shape[0], dtype=bool))
 
-    def probabilistic_constraint_over_hypers_negative(self, pred, factor = 1.0):
+    def probabilistic_constraint_over_hypers_negative(self, pred, factor = 1.0, C = 0):
         return reduce(np.logical_and, 
-            [ (1.0 - constraint_confidence_over_hypers(self.models[c], pred)) >= (1.0-self.tasks[c].options['delta']) * factor
+            [ (1.0 - constraint_confidence_over_hypers(self.models[c], pred, C = -C)) >= (1.0-self.tasks[c].options['delta']) * factor
                 for c in self.constraints ], 
                 np.ones(pred.shape[0], dtype=bool))
-
 
     def best(self):
 
@@ -911,7 +921,7 @@ class DefaultChooser(object):
 		# This is a multiobjective problem with constraints
 
 		# If there is not at least a observation per each task we return something random
-		
+
 		if not np.all(np.array(map(lambda t: t._inputs.shape[0], self.tasks.values())) >= 1):
 
 			design_index = np.random.randint(0, self.grid.shape[0])
@@ -922,11 +932,20 @@ class DefaultChooser(object):
 		else:
 
 			moop = MOOP(self.objectives, self.models, self.input_space)
+			moop_observ_model = MOOP(self.objectives, self.models, self.input_space)
 
 			# We only solve the multi-objective-problem after a particular number of observations
 			# The recommendations made before that are garbage
 
-			if self.total_inputs % (len(self.tasks) * self.options['iters_done_to_optimize_means_multiobjective']) == 0:
+	                task_couplings = {task_name : self.tasks[task_name].options["group"] for task_name in self.tasks}
+
+                        task_groups = defaultdict(list)
+                        for task_name, group in task_couplings.iteritems():
+                            task_groups[group].append(self.tasks[task_name])
+
+                        total_evals = np.sum(np.array(map(lambda g: np.min(map(lambda t: t._inputs.shape[0], g)), task_groups.values())))
+
+			if total_evals % (len(task_groups) * self.options['iters_done_to_optimize_means_multiobjective']) == 0:
 
 	                	logging.info('\nSolving Multi-objective global optimization of posterior means with constraints!')
 
@@ -936,20 +955,25 @@ class DefaultChooser(object):
 				assert self.options['moo_use_grid_only_to_solve_problem'] == True
 
 				# Now we iteratively find the best points that are likely to be beasible
+
                                 if self.options["use_sobol_grid_for_mo_optimization"]:
 				    grid = sobol_grid.generate(self.input_space.num_dims, \
 				        	self.input_space.num_dims * self.options['moo_grid_size_to_solve_problem'])
                                 else:
                                     state = np.random.get_state()
                                     np.random.seed(self.options["seed_for_uniform_grid"])
-                                    grid = np.random.uniform(size=(self.input_space.num_dims * self.options['moo_grid_size_to_solve_problem'],self.input_space.num_dims))
+                                    grid = np.random.uniform(size=(self.input_space.num_dims * self.options['moo_grid_size_to_solve_problem'],\
+                                        self.input_space.num_dims))
                                     np.random.set_state(state)
+
 				factor = 1.0
 
 				if self.options["acquisition"] != "BMOO":
-					grid_feasible = grid[ self.probabilistic_constraint_over_hypers(grid, factor), : ]
+					grid_feasible = grid[ self.probabilistic_constraint_over_hypers(grid, factor, \
+                                            C = self.options['moo_const_C_value']), : ]
 				else:
-					grid_feasible = grid[ self.probabilistic_constraint_over_hypers_negative(grid, factor), : ]
+					grid_feasible = grid[ self.probabilistic_constraint_over_hypers_negative(grid, factor, \
+                                            C = self.options['moo_const_C_value']), : ]
 
 
 				while len(grid_feasible) == 0:
@@ -965,25 +989,76 @@ class DefaultChooser(object):
 
 				moop.solve_using_grid(grid_feasible)
 
+                                # Now the optimization of the model observations
+
+                                grid_observed = None
+
+                                for key in self.models:
+                                    if grid_observed is None:
+                                        grid_observed = self.models[ key ].inputs
+                                    else:
+                                        grid_observed = np.vstack(( grid_observed, self.models[ key ].inputs ))
+
+				factor = 1.0
+
+				if self.options["acquisition"] != "BMOO":
+					grid_observed_feasible = grid_observed[ self.probabilistic_constraint_over_hypers(\
+                                            grid_observed, factor, C = self.options['moo_const_C_value']), : ]
+				else:
+					grid_observed_feasible = grid_observed[ self.probabilistic_constraint_over_hypers_negative(\
+                                            grid_observed, factor, C = self.options['moo_const_C_value']), : ]
+
+				while len(grid_observed_feasible) == 0:
+					factor *= 0.99
+
+					if factor < 1e-5:
+						factor = 0.0
+
+					if self.options["acquisition"] != "BMOO":
+						grid_observed_feasible = grid_observed[ self.probabilistic_constraint_over_hypers( \
+                                                    grid_observed, factor), : ]
+					else:
+						grid_observed_feasible = grid_observed[ self.probabilistic_constraint_over_hypers_negative( \
+                                                    grid_observed, factor), : ]
+
+				moop.solve_using_grid(grid_feasible)
+				moop_observ_model.solve_using_grid(grid_observed_feasible)
+
 			else:
 
 	                	logging.info('\nNot performing contrained multi-objective global optimization of posterior \
 					means at this iteration!')
 				moop.evolve(1, 8)
+				moop_observ_model.evolve(1, 8)
 
 			# We obtain the results
 
 			result = moop.compute_pareto_front_and_set()
+			result_observed_model  = moop_observ_model.compute_pareto_front_and_set()
 
 			# We return the data to the original space
 
 			for i in range(result['frontier'].shape[ 0 ]):
+
 				ntask = 0
+
 				for obj in self.objectives:
 					result['frontier'][ i, ntask ] = self.objectives[ obj ].unstandardize_mean( \
 						self.objectives[ obj ].unstandardize_variance(result['frontier'][ i, ntask ]))
-					ntask = ntask + 1
+				        ntask = ntask + 1
+
 				result['pareto_set'][ i, : ] = self.input_space.from_unit(result['pareto_set'][ i, : ])
+
+			for i in range(result_observed_model['frontier'].shape[ 0 ]):
+
+				ntask = 0
+
+				for obj in self.objectives:
+					result_observed_model['frontier'][ i, ntask ] = self.objectives[ obj ].unstandardize_mean( \
+						self.objectives[ obj ].unstandardize_variance(result_observed_model['frontier'][ i, ntask ]))
+				        ntask = ntask + 1
+
+				result_observed_model['pareto_set'][ i, : ] = self.input_space.from_unit(result_observed_model['pareto_set'][ i, : ])
 
 	 		logging.info('\nConstrained Multi-objective Global Optimization finished. \
 				Size of the pareto set: %d opt.\n' %  (result['frontier'].shape[ 0 ]))
@@ -994,8 +1069,8 @@ class DefaultChooser(object):
 				'model_model_value': result['frontier'],
 				'obser_obser_input' : None,
 				'obser_obser_value' : None,
-				'obser_model_input' : None,
-				'obser_model_value' : None}
+				'obser_model_input' : result_observed_model['pareto_set'],
+				'obser_model_value' : result_observed_model['frontier']}
 
 			self.stored_recommendation_multiobjective = rec
 
@@ -1245,16 +1320,17 @@ class DefaultChooser(object):
 
 	# XXX To remove!
 
-	grid = sobol_grid.generate(self.input_space.num_dims, 1000 * self.input_space.num_dims)
+#	grid = sobol_grid.generate(self.input_space.num_dims, 1000 * self.input_space.num_dims)
 
-        obj_mean, obj_var = obj_model.function_over_hypers(obj_model.predict, grid)
-        current_best_location = grid[np.argmin(obj_mean),:]
+#        obj_mean, obj_var = obj_model.function_over_hypers(obj_model.predict, grid)
+#        current_best_location = grid[np.argmin(obj_mean),:]
 
         # Compute the GP mean
-#        obj_mean, obj_var = obj_model.function_over_hypers(obj_model.predict, self.grid)
+        obj_mean, obj_var = obj_model.function_over_hypers(obj_model.predict, self.grid)
 
         # find the min and argmin of the GP mean
-#        current_best_location = self.grid[np.argmin(obj_mean),:]
+        current_best_location = self.grid[np.argmin(obj_mean),:]
+
         best_ind = np.argmin(obj_mean)
         current_best_value = obj_mean[best_ind]
         
@@ -1718,7 +1794,7 @@ class DefaultChooser(object):
 
 	acq_ap = function_over_hypers(self.models.values(), self.acq.acquisition,
                                 self.objective_model_dict, self.constraint_models_dict,
-                                spacing, self.stored_recommendation['model_model_value'], compute_grad=False, tasks=tasks)
+                                spacing, 0, compute_grad=False, tasks=tasks)
 
 	fig = plt.figure()
 	plt.plot(inputs, inputs * 0, color='black', marker='x', markersize=10, linestyle='None')
@@ -1813,6 +1889,8 @@ class DefaultChooser(object):
         x = np.linspace(0, 1, size)
         y = np.linspace(0, 1, size)
         X, Y = np.meshgrid(x, y)
+        X = X.copy()
+        Y = Y.copy()
 	spacing = np.zeros((size * size, 2))
 
 	for i in range(size):
@@ -1849,11 +1927,9 @@ class DefaultChooser(object):
 		for obj in tasks:
 			inputs  = self.input_space.from_unit(self.models[ obj ].inputs)
 	
-			acq_ap = function_over_hypers(self.models.values(), self.acq.acquisition,\
-				self.objective_model_dict, self.constraint_models_dict, \
-				spacing, (self.stored_recommendation['model_model_value'] - self.objective.standardization_mean) \
-				/ self.objective.standardization_variance,\
-				compute_grad=False, tasks=[ obj ])
+			acq_ap = function_over_hypers(self.models.values(), self.acq.acquisition,
+				self.objective_model_dict, self.constraint_models_dict,
+				spacing, 0, compute_grad=False, tasks=[ obj ])
 
 			fig = plt.figure()
 			plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None')
@@ -1878,17 +1954,17 @@ class DefaultChooser(object):
 					if np.min(cdist(instance.reshape(1, len(instance)), inputs)) > 0:
 						inputs = np.vstack((inputs, instance))
 
-		acq_ap = function_over_hypers(self.models.values(), self.acq.acquisition,\
-			self.objective_model_dict, self.constraint_models_dict, \
-			spacing, (self.stored_recommendation['model_model_value'] - self.objective.standardization_mean) \
-			/ self.objective.standardization_variance,\
-			compute_grad=False, tasks=tasks, tasks_values = self.tasks)
-#		import pdb; pdb.set_trace();
+		acq_ap = function_over_hypers(self.models.values(), self.acq.acquisition,
+			self.objective_model_dict, self.constraint_models_dict,
+			spacing, (self.stored_recommendation['model_model_value'] - \
+                        self.objective.standardization_mean) / self.objective.standardization_variance,
+                        compute_grad=False, tasks=tasks, tasks_values = self.tasks)
+
                 if not np.all(acq_ap == 0):
 		    fig = plt.figure()
 		    plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None')
 #		    im = plt.imshow(acq_ap.reshape((size, size)).T, interpolation = 'bilinear', origin = 'lower', cmap = cm.gray, extent = (0, 1, 0, 1))
-		    CS = plt.contour(X, Y, acq_ap[0:size*size].reshape((size, size)).T)
+		    CS = plt.contour(X, Y, acq_ap.reshape((size, size)).T)
 	    	    plt.clabel(CS, inline=True, fontsize=10)
 		    plt.savefig('./figures/' + str(n_total) + '-acq.pdf', format='pdf', dpi=1000)
 		    plt.close(fig)
@@ -1903,6 +1979,8 @@ class DefaultChooser(object):
                     mean[ key ] = self.objectives[ key ].unstandardize_mean(self.objectives[ key ].unstandardize_variance(mean[ key ]))
                     var[ key ] = self.objectives[ key ].unstandardize_variance(var[ key ])
 		else:
+#                    mean[ key ] = self.constraints[ key ].unstandardize_variance(mean[ key ])
+#                    var[ key ] = self.constraints[ key ].unstandardize_variance(var[ key ])
                     mean[ key ] = mean[ key ]
                     var[ key ] = var[ key ]
 
@@ -1915,12 +1993,13 @@ class DefaultChooser(object):
 #			cmap = cm.gray, extent = (0, 1, 0, 1))
 		    CS = plt.contour(X, Y, mean[ key ].reshape((size, size)).T)
 		    plt.clabel(CS, inline=1, fontsize=10)
-		    if self.stored_recommendation['model_model_input'].ndim > 1:
-	            	plt.plot(self.stored_recommendation['model_model_input'][:, 0 ], self.stored_recommendation['model_model_input'][:, 1], \
-				'black', marker = 'o', linestyle = 'None')
-		    else:
-			plt.plot(self.stored_recommendation['model_model_input'][ 0 ], self.stored_recommendation['model_model_input'][ 1 ], \
-                                'black', marker = 'o', linestyle = 'None')
+                    if len(set(task_couplings.values())) == 1:
+         	            plt.plot(self.stored_recommendation['model_model_input'][0 ], self.stored_recommendation['model_model_input'][1], \
+        			'black', marker = 'o', linestyle = 'None')
+                    else:
+                            plt.plot(self.stored_recommendation['model_model_input'][:,0 ], self.stored_recommendation['model_model_input'][:,1], \
+        			'black', marker = 'o', linestyle = 'None')
+
 		    plt.savefig('./figures/' + str(n_total) + '-' + key + '-mean.pdf', format='pdf', dpi=1000)
 		    plt.close(fig)
                 if not np.all(var[ key ] == var[ key ][ 0 ]):
@@ -1930,12 +2009,13 @@ class DefaultChooser(object):
 #	    		cmap = cm.gray, extent = (0, 1, 0, 1))
 		    CS = plt.contour(X, Y, var[ key ].reshape((size, size)).T)
 		    plt.clabel(CS, inline=1, fontsize=10)
-		    if self.stored_recommendation['model_model_input'].ndim == 1: 
-	            	plt.plot(self.stored_recommendation['model_model_input'][0], self.stored_recommendation['model_model_input'][1], \
-	    			'black', marker = 'o', linestyle = 'None')
-		    else:
-	            	plt.plot(self.stored_recommendation['model_model_input'][:, 0 ], self.stored_recommendation['model_model_input'][:, 1], \
-	    			'black', marker = 'o', linestyle = 'None')
+
+                    if len(set(task_couplings.values())) == 1:
+        	            plt.plot(self.stored_recommendation['model_model_input'][ 0 ], self.stored_recommendation['model_model_input'][ 1 ], \
+        	    		'black', marker = 'o', linestyle = 'None')
+                    else:
+        	            plt.plot(self.stored_recommendation['model_model_input'][:, 0 ], self.stored_recommendation['model_model_input'][:, 1], \
+        	    		'black', marker = 'o', linestyle = 'None')
 		    plt.savefig('./figures/' + str(n_total) + '-' + key + '-var.pdf', format='pdf', dpi=1000)
 		    plt.close(fig)
 
@@ -1951,18 +2031,19 @@ class DefaultChooser(object):
 		plt.savefig('./figures/' + str(n_total) + '-frontier.pdf', format='pdf', dpi=1000)
 		plt.close(fig)
 
-	else:
-		if len(tasks) > 2:
-			from mpl_toolkits.mplot3d import Axes3D	
-			fig = plt.figure()
-			ax = fig.add_subplot(111, projection='3d')
-			ax.scatter(mean[ objectives[ 0 ] ], mean[ objectives[ 1 ] ], mean[ objectives[ 2 ] ], c = 'red', marker = 'o', alpha = 0.1)
-			ax.scatter(self.stored_recommendation['model_model_value'][:,0], \
-				self.stored_recommendation['model_model_value'][:,1], \
-				self.stored_recommendation['model_model_value'][:,2], c = 'blue', marker ='x')
-			ax.view_init(30, -135)
-			plt.savefig('./figures/' + str(n_total) + '-frontier.pdf', format='pdf', dpi=1000)
-			plt.close(fig)
+	elif len(tasks) > 2:
+
+		from mpl_toolkits.mplot3d import Axes3D
+		
+		fig = plt.figure()
+		ax = fig.add_subplot(111, projection='3d')
+		ax.scatter(mean[ objectives[ 0 ] ], mean[ objectives[ 1 ] ], mean[ objectives[ 2 ] ], c = 'red', marker = 'o', alpha = 0.1)
+		ax.scatter(self.stored_recommendation['model_model_value'][:,0], \
+			self.stored_recommendation['model_model_value'][:,1], \
+			self.stored_recommendation['model_model_value'][:,2], c = 'blue', marker ='x')
+		ax.view_init(30, -135)
+		plt.savefig('./figures/' + str(n_total) + '-frontier.pdf', format='pdf', dpi=1000)
+		plt.close(fig)
 
     def print_frontier(self):
 
@@ -2014,6 +2095,8 @@ class DefaultChooser(object):
                     mean[ key ] = self.objectives[ key ].unstandardize_mean(self.objectives[ key ].unstandardize_variance(mean[ key ]))
                     var[ key ] = self.objectives[ key ].unstandardize_variance(var[ key ])
                 else:
+#                    mean[ key ] = self.constraints[ key ].unstandardize_variance(mean[ key ])
+#                    var[ key ] = self.constraints[ key ].unstandardize_variance(var[ key ])
                     mean[ key ] = mean[ key ]
                     var[ key ] = var[ key ]
 
