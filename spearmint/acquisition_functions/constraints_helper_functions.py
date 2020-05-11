@@ -187,8 +187,8 @@ import numpy.random   as npr
 import scipy.linalg   as spla
 import numpy.linalg   as npla
 
-def constraint_confidence(model, x, compute_grad=False):
-    return model.pi(x, compute_grad=compute_grad)
+def constraint_confidence(model, x, compute_grad=False, C = 0):
+    return model.pi(x, compute_grad=compute_grad, C = C)
 
 def total_constraint_confidence(constraint_models, x, compute_grad=False):
     # Compute p(valid) for ALL constraints
@@ -219,8 +219,8 @@ def total_constraint_confidence(constraint_models, x, compute_grad=False):
         return p_valid_prod, p_grad_prod
 
 # The confidence that conststraint c is satisfied
-def constraint_confidence_over_hypers(model, x, compute_grad=False):
-    return model.function_over_hypers(constraint_confidence, model, x, compute_grad=compute_grad)
+def constraint_confidence_over_hypers(model, x, compute_grad=False, C = 0):
+    return model.function_over_hypers(constraint_confidence, model, x, compute_grad=compute_grad, C = C)
 
 # Compute the product of confidences over all constraints
 # because each constraint is independent and we are just multiplying functions of them
