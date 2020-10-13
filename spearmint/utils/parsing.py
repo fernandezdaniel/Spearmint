@@ -208,8 +208,8 @@ def unpack_args(str):
                         re.compile("\s*,\s*").split(str)))
     else:
         return {}
-            
-# For parsing the input arguments to a Chooser. 
+
+# For parsing the input arguments to a Chooser.
 # "argTypes" is a dict with keys of argument names and
 # values of tuples with the (argType, argDefaultValue)
 # args is the dict of arguments passd in by the used
@@ -224,18 +224,18 @@ def parse_args(argTypes, args):
                 logging.error("Cannot parse user-specified value %s of argument %s" % (args[arg], arg))
         else:
             opt[arg] = argTypes[arg][1]
- 
+
     return opt
 
 
 
 
 
- 
+
 DEFAULT_RESOURCE_NAME    = 'Main'
 DEFAULT_MODEL            = "GP"
 DEFAULT_LIKELIHOOD       = 'gaussian'
-DEFAULT_DATABASE_ADDRESS = 'localhost' 
+DEFAULT_DATABASE_ADDRESS = 'localhost'
 DEFAULT_SCHEDULER        = 'local'
 DEFAULT_MAX_FINISHED_JOBS= np.inf
 DEFAULT_MAX_CONCURRENT   = 1
@@ -253,7 +253,7 @@ DEFAULT_UNIT_TOLERANCE   = 1e-4  # the tolerance with respect to the unit space
 DEFAULT_OPT_ACQ_MAXEVAL  = 5000
 DEFAULT_NLOPT_CONSTRAINT_TOLERANCE = 1e-8
 DEFAULT_COST             = 1.0
-DEFAULT_ALWAYS_SAMPLE    = True  
+DEFAULT_ALWAYS_SAMPLE    = True
 DEFAULT_GROUP            = 0
 DEFAULT_SCALE_DURATIONS  = False
 # above: if this is True (default), then the chooser's fit() was always refit all the GPs
@@ -300,13 +300,13 @@ def parse_config_file(config_file_dir, config_file_name, verbose=True):
     if 'tasks' not in options:
         options['tasks'] = dict()
         options['tasks'][DEFAULT_TASK_NAME] = {
-            'type'       : 'OBJECTIVE', 
+            'type'       : 'OBJECTIVE',
             'likelihood' : options.get('likelihood', DEFAULT_LIKELIHOOD) }
 
         if 'num_constraints' in options:
             for i in xrange(int(options['num_constraints'])):
                 options['tasks']['%s%d' % (DEFAULT_CONSTRAINT_NAME, i)] = {
-                    'type'       : 'CONSTRAINT', 
+                    'type'       : 'CONSTRAINT',
                     'likelihood' : options.get('likelihood', DEFAULT_LIKELIHOOD) }
 
     if "model" not in options:
@@ -397,9 +397,13 @@ def parse_config_file(config_file_dir, config_file_name, verbose=True):
     for task_name, task_opts in options['tasks'].iteritems():
         if "transformations" not in task_opts:
             # If you are using PES, turn off transformations!!
-            if options["acquisition"] == "PES" or options["acquisition"] == "PESM" or options["acquisition"] == "PESMC":
+            if (options["acquisition"] == "PES"
+                or options["acquisition"] == "PESM"
+                or options["acquisition"] == "PESMC"
+                or options["acquisition"] == "MESMC"
+                or options["acquisition"] == "MESMCNAV"):
                 task_opts['transformations'] = []
-            else:    
+            else:
                 task_opts['transformations'] = DEFAULT_TRANSFORMATIONS
 
 
@@ -407,9 +411,9 @@ def parse_config_file(config_file_dir, config_file_name, verbose=True):
 
     numObjectives = len(get_objectives_and_constraints(options)[0])
 
-    if numObjectives > 1 and not (options["acquisition"] in set(['PESM','ParEGO', 'RANDOM', 'EHI', 'SUR', 'SMSego', 'PESMC', 'BMOO'])):
+    if numObjectives > 1 and not (options["acquisition"] in set(['PESM','ParEGO', 'RANDOM', 'EHI', 'SUR', 'SMSego', 'PESMC', 'MESMC', 'MESMCNAV', 'BMOO'])):
         raise Exception("You have %d objectives (i.e. a multi-objective problem) and an acquisition function different \
-			from EHI, PESM, PESMC, ParEGO, SUR or SMSego." \
+			from EHI, PESM, PESMC, MESMC, MESMCNAV, ParEGO, SUR or SMSego." \
 		% numObjectives)
 
     # set the default deltas
@@ -432,10 +436,10 @@ def parse_config_file(config_file_dir, config_file_name, verbose=True):
         if 'datebase' not in options:
             options['database'] = dict()
         options['database']['address'] = db_address
-        logging.info('Got database address %s from environment variable\n' % db_address)        
+        logging.info('Got database address %s from environment variable\n' % db_address)
     else:
         options['database'] = options.get('database', {'name': DEFAULT_DATABASE_NAME, 'address': DEFAULT_DATABASE_ADDRESS})
-    
+
     if verbose:
         for task_name, task_opts in options['tasks'].iteritems():
             logging.debug('Found Task "%s"' % task_name)
@@ -484,7 +488,7 @@ def parse_resources_from_config(config):
 
     return resources
 
-# Parses out the names of the tasks associated with a particular resource, from the config dict. 
+# Parses out the names of the tasks associated with a particular resource, from the config dict.
 def _parse_tasks_in_resource_from_config(resource_name, config):
 
     # If the user did not explicitly specify tasks, then we have to assume
@@ -502,7 +506,7 @@ def _parse_tasks_in_resource_from_config(resource_name, config):
             if resource_name in task_config["resources"]:
                 tasks.append(task_name)
 
-    return tasks 
+    return tasks
 
 def parse_priors_from_config(options):
     parsed = dict()
@@ -570,7 +574,7 @@ def parse_tasks_from_jobs(jobs, experiment_name, options, input_space):
     # input space. I guess this is generally fine, if we do the ignoredims thing.
     # (meaning if they live in difference spaces, concatenate their spaces and just
     # ignore irrelevant dimensions for each task)
-    
+
     # Here is what I actually want: to be able to hash the inputs
 
     # added because PESC is only for GPs
@@ -604,10 +608,10 @@ def parse_tasks_from_jobs(jobs, experiment_name, options, input_space):
             nan_likelihood = 'step' if all_noiseless else 'binomial'
 
             # WARNING:
-            # There is a problem here. Before I was taking the unique set.  
+            # There is a problem here. Before I was taking the unique set.
             # But what if you evaluate at the same place twice? You lose the new data.
             # Then spearmint repeatedly evaluates at this place because it never gets new data
-            #  ... this is catastrophic. 
+            #  ... this is catastrophic.
             # So I think I won't do this, at the risk of having repeated entries in here
             # It will make things slower but at least it will be less risky...
 
@@ -638,7 +642,7 @@ def parse_tasks_from_jobs(jobs, experiment_name, options, input_space):
         nan_task_options['constraint_tol'] = options.get("constraint_tol", DEFAULT_NLOPT_CONSTRAINT_TOLERANCE)
         if options["acquisition"] == "PES":
             nan_task_options['transformations'] = []
-        else:    
+        else:
             nan_task_options['transformations'] = options.get("transformations", DEFAULT_TRANSFORMATIONS)
         nan_task_options['cost']  = DEFAULT_COST
 

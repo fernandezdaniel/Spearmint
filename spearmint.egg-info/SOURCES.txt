@@ -1,5 +1,8 @@
+README.md
 setup.py
+./pbivnorm/pbivnorm-f2pywrappers.f
 ./pbivnorm/pbivnorm.f
+./pbivnorm/pbivnormmodule.c
 spearmint/__init__.py
 spearmint/cleanup.py
 spearmint/cleanup_experiments.py
@@ -21,6 +24,8 @@ spearmint/acquisition_functions/constraints_helper_functions.py
 spearmint/acquisition_functions/expected_hypervolume_improvement.py
 spearmint/acquisition_functions/expected_improvement.py
 spearmint/acquisition_functions/knowledge_gradient.py
+spearmint/acquisition_functions/max_value_entropy_search_multiobjective_constraints.py
+spearmint/acquisition_functions/max_value_entropy_search_multiobjective_constraints_naive.py
 spearmint/acquisition_functions/par_ego.py
 spearmint/acquisition_functions/predictive_entropy_search.py
 spearmint/acquisition_functions/predictive_entropy_search_multiobjective.py
@@ -28,7 +33,7 @@ spearmint/acquisition_functions/predictive_entropy_search_multiobjective_constra
 spearmint/acquisition_functions/predictive_entropy_search_multiobjective_constraints_edu.py
 spearmint/acquisition_functions/predictive_entropy_search_multiobjective_constraints_repo.py
 spearmint/acquisition_functions/predictive_entropy_search_multiobjective_constraints_v1.py
-spearmint/acquisition_functions/random.py
+spearmint/acquisition_functions/randomAcq.py
 spearmint/acquisition_functions/sequential_uncertainty_reduction.py
 spearmint/acquisition_functions/sms_ego.py
 spearmint/choosers/__init__.py

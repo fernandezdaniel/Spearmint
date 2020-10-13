@@ -280,8 +280,8 @@ class DefaultChooser(object):
         self.num_dims    = input_space.num_dims
 
         if not self.options['regenerate_grid']:
-            self.original_grid = sobol_grid.generate(self.num_dims, 
-                grid_size=self.options['grid_size'], 
+            self.original_grid = sobol_grid.generate(self.num_dims,
+                grid_size=self.options['grid_size'],
                 grid_seed=self.options['grid_seed'])
         self.grid = None
 
@@ -335,8 +335,8 @@ class DefaultChooser(object):
         # A useful hack: add previously visited points to the grid (do this every time)
 
         if self.options['regenerate_grid']:
-            grid = sobol_grid.generate(self.num_dims, 
-            grid_size=self.options['grid_size'], 
+            grid = sobol_grid.generate(self.num_dims,
+            grid_size=self.options['grid_size'],
             grid_seed=npr.randint(0, self.options['grid_size']))
         else:
             grid = self.original_grid
@@ -373,10 +373,14 @@ class DefaultChooser(object):
 
 
             # Don't re-instantiate the model every time
-		
+
             if task_name not in self.models:
-                
-                if (task.options["acquisition"] == "PESM" or task.options["acquisition"] == "PES" or task.options["acquisition"] == "PESMC") and task.options.get("fit_mean", True):
+
+                if (task.options["acquisition"] == "PESM"
+					or task.options["acquisition"] == "PES"
+					or task.options["acquisition"] == "PESMC"
+					or task.options["acquisition"] == "MESMC"
+					or task.options["acquisition"] == "MESMCNAV") and task.options.get("fit_mean", True):
                     logging.debug("Warning: PES or PESM is used and fit_mean is on. Setting fit_mean to False!")
                     task.options["fit_mean"] = False
                     # raise Exception("If PES is used, then you must set fit_mean to 0")
@@ -405,7 +409,7 @@ class DefaultChooser(object):
                     self.models[task_name].fit(inputs, values, pending=pending, fit_hypers=False)
 
                 # hypers are unchanged
-                new_hypers[task_name] = hypers[task_name] # ... .get(task_name, None)? 
+                new_hypers[task_name] = hypers[task_name] # ... .get(task_name, None)?
             else:
                 logging.info('Fitting %s to %d data for %s task...' % (model_class_name, len(values), task_name))
                 new_hypers[task_name] = self.models[task_name].fit(
@@ -417,14 +421,14 @@ class DefaultChooser(object):
             if self.options['scale-duration']:
                 # need to do the same here
                 if task_name not in self.duration_models:
-                    # BTW, it's a bit wasteful to have a separate GP here, since the inputs are the same 
+                    # BTW, it's a bit wasteful to have a separate GP here, since the inputs are the same
                     # for the durations and the other stuff, and the expensive part is this matrix inversion
                     # but let's just not worry about that right now
 
 		    # We remove all task transformations except for IgnoreDims
 
 		    task_options_only_ignore_dims  = task.options.copy()
-		
+
 		    for trans in task_options_only_ignore_dims['transformations']:
 	            	if not trans.keys()[ 0 ] == "IgnoreDims":
 				task_options_only_ignore_dims['transformations'].remove(trans)
@@ -454,8 +458,8 @@ class DefaultChooser(object):
                     # print np.log(task.durations)
                     # print new_hypers['duration hypers']
                     new_hypers['duration hypers'][task_name] = self.duration_models[task_name].fit(
-                        self.input_space.to_unit(task.inputs), # not just valid inputs -- all inputs 
-                        np.log(task.durations), 
+                        self.input_space.to_unit(task.inputs), # not just valid inputs -- all inputs
+                        np.log(task.durations),
                         hypers=hypers['duration hypers'].get(task_name, None))
                     # print task.durations
 
@@ -497,19 +501,19 @@ class DefaultChooser(object):
 		return suggestion, task_names
 
         # Indeed it does not make sense to compute the best() and all that if we
-        # have absolutely no data. 
+        # have absolutely no data.
         # But I want to be careful here because of the problem I had before, that we
         # never observed the objective (kept getting NaNs) and so kept picking randomly
         # that is not good at all-- need to use the GPs to model the NaNs.
         # so, if I REALLY have no data, then I want to do this. But that means no data
-        # from ANY of the tasks. 
+        # from ANY of the tasks.
 
         if self.total_inputs < DEFAULT_NUMDESIGN:
             design_index = npr.randint(0, grid.shape[0])
             suggestion = self.input_space.from_unit(grid[design_index : (design_index + 1), :])
             logging.info("\nSuggestion:     ")
             self.input_space.paramify_and_print(suggestion.flatten(), left_indent=16)
-	
+
 	    suggestion = suggestion.flatten()
 
             if len(set(task_couplings.values())) > 1: # if decoupled
@@ -519,7 +523,7 @@ class DefaultChooser(object):
                 return suggestion, task_groups[ random.choice(task_groups.keys()) ]
             else:  # if not decoupled. this is a bit of a hack but w/e
                 return suggestion, task_names
-	
+
 	# If it is a multi-objective problem and there are not at least one observation per each task,
 	# we recommend something random corresponding to the tasks without any observation.
         # CHECK TO PUT HERE CONSTRAINTS.
@@ -548,7 +552,7 @@ class DefaultChooser(object):
                                 return suggestion, task_groups_labels[ task_groups_labels.keys()[ choice ] ]
 			else:  # if not decoupled. this is a bit of a hack but w/e
 				return suggestion, task_names
-	
+
         # Make sure all tasks here have the same acquisition function
         # if len({self.acquisition_functions[t]["name"] for t in task_names}) > 1:
             # raise Exception("If you are getting a suggestion for more than 1 task, they must all have the same acquisition function")
@@ -559,7 +563,7 @@ class DefaultChooser(object):
 
         current_best_value    = self.stored_recommendation['model_model_value']
         current_best_location = self.stored_recommendation['model_model_input']
-        
+
         # Put the best into the normalized space
         current_best_location = self.input_space.to_unit(current_best_location)
 
@@ -574,11 +578,11 @@ class DefaultChooser(object):
 
 	        spray_points = npr.randn(self.options['num_spray'], self.num_dims)*self.options['spray_std'] + current_best_location
 		spray_points = np.minimum(np.maximum(spray_points,0.0),1.0) # make sure they are within the unit hypercube
-        
+
 		# also add the current best
 		grid_plus_spray = np.vstack((grid, spray_points, current_best_location))
 	else:
-		# If it is a multiobjective problem we only add the seen points, plus the current best values of 
+		# If it is a multiobjective problem we only add the seen points, plus the current best values of
 		# each objective with a spray of points
 
 	        local_grid = sobol_grid.generate(self.num_dims, grid_size = 20000)
@@ -592,7 +596,7 @@ class DefaultChooser(object):
 		for i in range(len(self.models)):
 
 			current_best_location = self.find_optimum_gp(self.models[ self.models.keys()[ i ] ], local_grid)
-			
+
 	        	spray_points = npr.randn(self.options['num_spray'], self.num_dims)*self.options['spray_std'] + current_best_location
 			spray_points = np.minimum(np.maximum(spray_points,0.0),1.0) # make sure they are within the unit hypercube
 
@@ -657,7 +661,7 @@ class DefaultChooser(object):
                 best_acq["value"] /= group_costs[group]
                 if group_costs[group] != 1:
                     logging.debug("Scaling best acq for %s by a %s factor of 1/%f, from %f to %f" % ( \
-                            task_groups[group], 
+                            task_groups[group],
                                 "duration" if self.options['scale-duration'] else "cost",
                             group_costs[group],
                             best_acq["value"]*group_costs[group],
@@ -702,7 +706,7 @@ class DefaultChooser(object):
         logging.info("Computing %s for %s" % (acq_name, ', '.join(task_names)))
 
         # Compute the acquisition function on the grid
-        grid_acq = function_over_hypers(self.models.values(), acq.acquisition, 
+        grid_acq = function_over_hypers(self.models.values(), acq.acquisition,
                                         self.objective_model_dict, self.constraint_models_dict,
                                         grid, current_best_value, compute_grad=False, tasks=task_names, tasks_values=self.tasks)
 
@@ -741,12 +745,12 @@ class DefaultChooser(object):
 
         # logging.info("\nBest acq grid value:     ")
         # self.input_space.paramify_and_print(self.input_space.from_unit(best_acq_location).flatten(), left_indent=16)
-        
+
 
         if self.options['optimize_acq']:
 
             if self.options['check_grad']:
-                check_grad(lambda x: function_over_hypers(self.models.values(), acq.acquisition, 
+                check_grad(lambda x: function_over_hypers(self.models.values(), acq.acquisition,
                     self.objective_model_dict, self.constraint_models_dict, x, current_best_value, compute_grad=True),
                            best_acq_location, verbose=True, tasks=task_names, tasks_values=self.tasks)
 
@@ -756,7 +760,7 @@ class DefaultChooser(object):
                 opt = nlopt.opt(alg, self.num_dims)
 
                 logging.info('Optimizing %s with NLopt, %s' % (acq_name, opt.get_algorithm_name()))
-                
+
                 opt.set_lower_bounds(0.0)
                 opt.set_upper_bounds(1.0)
 
@@ -766,7 +770,7 @@ class DefaultChooser(object):
                         x = x[None,:]
 
                     if put_gradient_here.size > 0:
-                        a, a_grad = function_over_hypers(self.models.values(), acq.acquisition, 
+                        a, a_grad = function_over_hypers(self.models.values(), acq.acquisition,
                                 self.objective_model_dict, self.constraint_models_dict,
                                 x, current_best_value, compute_grad=True, tasks=task_names, tasks_values=self.tasks)
                         put_gradient_here[:] = a_grad.flatten()
@@ -818,7 +822,7 @@ class DefaultChooser(object):
                     def f(x):
                         if x.ndim == 1:
                             x = x[None,:]
-                        a, a_grad = function_over_hypers(self.models.values(), acq.acquisition, 
+                        a, a_grad = function_over_hypers(self.models.values(), acq.acquisition,
                                     self.objective_model_dict, self.constraint_models_dict,
                                     x, current_best_value, compute_grad=True, tasks=task_names, tasks_values=self.tasks)
                         return (-a.flatten(), -a_grad.flatten())
@@ -826,14 +830,14 @@ class DefaultChooser(object):
                     def f(x):
                         if x.ndim == 1:
                             x = x[None,:]
-                        a = function_over_hypers(self.models.values(), acq.acquisition, 
+                        a = function_over_hypers(self.models.values(), acq.acquisition,
                                     self.objective_model_dict, self.constraint_models_dict,
                                     x, current_best_value, compute_grad=False, tasks=task_names, tasks_values=self.tasks)
 
                         return -a.flatten()
-                
+
                 bounds = [(0,1)]*self.num_dims
-                x_opt, y_opt, opt_info = spo.fmin_l_bfgs_b(f, best_acq_location.copy(), 
+                x_opt, y_opt, opt_info = spo.fmin_l_bfgs_b(f, best_acq_location.copy(),
                     bounds=bounds, disp=0, approx_grad=not acq.has_gradients)
                 y_opt = -y_opt
                 # make sure bounds are respected
@@ -855,13 +859,13 @@ class DefaultChooser(object):
             logging.debug('Best %s on grid: %f' % (acq_name, best_grid_acq_value))
 
     	#self.print_frontier()
-#        self.print_images_2d()
+        #self.print_images_2d()
 
         return {"location" : best_acq_location, "value" : best_acq_value}
 
     @property
     def objective_model(self):
-        return self.models[self.objective.name]    
+        return self.models[self.objective.name]
     @property
     def obj_model(self):
         return self.models[self.objective.name]
@@ -881,15 +885,15 @@ class DefaultChooser(object):
     # Returns a boolean array of size pred.shape[0] indicating whether the prob con-constraint is satisfied there
 
     def probabilistic_constraint_over_hypers(self, pred, factor = 1.0, C = 0):
-        return reduce(np.logical_and, 
+        return reduce(np.logical_and,
             [ constraint_confidence_over_hypers(self.models[c], pred, C = C) >= (1.0-self.tasks[c].options['delta']) * factor
-                for c in self.constraints ], 
+                for c in self.constraints ],
                 np.ones(pred.shape[0], dtype=bool))
 
     def probabilistic_constraint_over_hypers_negative(self, pred, factor = 1.0, C = 0):
-        return reduce(np.logical_and, 
+        return reduce(np.logical_and,
             [ (1.0 - constraint_confidence_over_hypers(self.models[c], pred, C = -C)) >= (1.0-self.tasks[c].options['delta']) * factor
-                for c in self.constraints ], 
+                for c in self.constraints ],
                 np.ones(pred.shape[0], dtype=bool))
 
     def best(self):
@@ -1076,11 +1080,11 @@ class DefaultChooser(object):
 
 	elif self.numConstraints() == 0 and len(self.objectives) > 1:
 
-		# If it is a multiobjective problem we solve the problem and return an approximation to 
+		# If it is a multiobjective problem we solve the problem and return an approximation to
 		# the pareto set of the current functions (as estimated by the means of the GP).
 
 		# If there is not at least a observation per each objective we return something random
-		
+
 		if not np.all(np.array(map(lambda t: t._inputs.shape[0], self.tasks.values())) >= 1):
 
 			design_index = np.random.randint(0, self.grid.shape[0])
@@ -1098,7 +1102,7 @@ class DefaultChooser(object):
 			if self.total_inputs % (len(self.objectives) * self.options['iters_done_to_optimize_means_multiobjective']) == 0:
 
 	                	logging.info('\nSolving Multi-objective global optimization of posterior means!')
-			
+
 				# We check if we have to use nsga2 or a grid to solve the mo optimization problem
 
 				if self.options['moo_use_grid_only_to_solve_problem'] == True:
@@ -1108,19 +1112,19 @@ class DefaultChooser(object):
 
 #		        		local_grid = sobol_grid.generate(self.num_dims, grid_size = 20000)
 #					local_grid = np.vstack((local_grid, self.grid[ self.options['grid_size'] : self.grid.shape[ 0 ], : ]))
-#	
+#
 #					# We add to the population the best of each objective plus a spray of points
-#	
+#
 #					for i in range(len(self.models)):
-#	
+#
 #						current_best_location = self.find_optimum_gp(self.models[ self.models.keys()[ i ] ], local_grid)
-#				
+#
 #						spray_points = npr.randn(self.options['num_spray'], self.num_dims) * \
 #							self.options['spray_std'] + current_best_location
-#						spray_points = np.minimum(np.maximum(spray_points,0.0),1.0) 
-#	
+#						spray_points = np.minimum(np.maximum(spray_points,0.0),1.0)
+#
 #						to_add = np.vstack((spray_points, current_best_location))
-#	
+#
 #						for i in range(to_add.shape[ 0 ]):
 #							moop.append_to_population(to_add[ i, : ])
 				else:
@@ -1130,19 +1134,19 @@ class DefaultChooser(object):
 
 		        		local_grid = sobol_grid.generate(self.num_dims, grid_size = 20000)
 					local_grid = np.vstack((local_grid, self.grid[ self.options['grid_size'] : self.grid.shape[ 0 ], : ]))
-	
+
 					# We add to the population the best of each objective plus a spray of points
-	
+
 					for i in range(len(self.models)):
-	
+
 						current_best_location = self.find_optimum_gp(self.models[ self.models.keys()[ i ] ], local_grid)
-				
+
 						spray_points = npr.randn(self.options['num_spray'], self.num_dims) * \
 							self.options['spray_std'] + current_best_location
-						spray_points = np.minimum(np.maximum(spray_points,0.0),1.0) 
-	
+						spray_points = np.minimum(np.maximum(spray_points,0.0),1.0)
+
 						to_add = np.vstack((spray_points, current_best_location))
-	
+
 						for i in range(to_add.shape[ 0 ]):
 							moop.append_to_population(to_add[ i, : ])
 
@@ -1160,23 +1164,23 @@ class DefaultChooser(object):
 			else:
 	                	logging.info('\nNot performing the multi-objective global optimization of posterior means at this iteration!')
 				moop.evolve(1, 8)
-	
+
 			result = moop.compute_pareto_front_and_set()
 
 			# It it is a decoupled scenario we do not return non-dominated observations, because for each observation
 			# we may only have observed one objective.
-	
+
 			task_couplings = {task_name : self.tasks[task_name].options["group"] for task_name in self.tasks}
-	
+
 			if len(set(task_couplings.values())) <= 1:
 				result_o = moop.get_non_dominated_observations()
 			else:
-		
+
 				# In the case of a decoupled evaluation for each observation we only have one objective
 				# In this case we use the models to predict the missing values
 
 				result_o = moop.get_non_dominated_observations_predict_missing_observations()
-	
+
 			# We return the data to the original space
 
 			for i in range(result['frontier'].shape[ 0 ]):
@@ -1194,7 +1198,7 @@ class DefaultChooser(object):
 						self.objectives[ obj ].unstandardize_variance(result_o['frontier'][ i, ntask ]))
 					ntask = ntask + 1
 				result_o['pareto_set'][ i, : ] = self.input_space.from_unit(result_o['pareto_set'][ i, : ])
-	
+
 	 		logging.info('\nGlobal Optimization finished. Size of the pareto set: %d opt. %d observed.\n' % \
 				(result['frontier'].shape[ 0 ], result_o['frontier'].shape[ 0 ]))
 
@@ -1218,7 +1222,7 @@ class DefaultChooser(object):
 
         elif self.numConstraints() == 0:
             logging.info('Computing current best...')
-            
+
             val, loc = self.best_unconstrained()
             val_o, loc_o = self.bestObservedUnconstrained()
 
@@ -1276,7 +1280,7 @@ class DefaultChooser(object):
 		grid = self.grid
 
 	# Compute the GP mean
-	
+
 	obj_mean, obj_var = obj_model.function_over_hypers(obj_model.predict, grid)
 
 	# find the min and argmin of the GP mean
@@ -1306,7 +1310,7 @@ class DefaultChooser(object):
 
 
     """
-    When computing the best we cannot be Bayesian and average the bests 
+    When computing the best we cannot be Bayesian and average the bests
     because these are x locations which do not make sense to average
     So we average over hypers and then optimize THAT
     """
@@ -1314,7 +1318,7 @@ class DefaultChooser(object):
         """
         if options['optimize_best'] is False, we will just compute on a grid and take the best
         if it is True (default), then we try to use NLopt. Otherwise if NLopt isn't installed
-        we will use some python SLSQP 
+        we will use some python SLSQP
         """
         obj_model = self.models[self.objective.name]
 
@@ -1333,12 +1337,12 @@ class DefaultChooser(object):
 
         best_ind = np.argmin(obj_mean)
         current_best_value = obj_mean[best_ind]
-        
+
         # optimize with NLopt?
         if self.options['optimize_best']:
             if nlopt_imported:
                 opt = nlopt.opt(self.nlopt_method, self.num_dims)
-                
+
                 logging.info('Optimizing current best with NLopt, %s' % opt.get_algorithm_name())
 
                 opt.set_lower_bounds(0.0)
@@ -1367,7 +1371,7 @@ class DefaultChooser(object):
                 x_opt = opt.optimize(current_best_location.copy())
 
                 returncode = opt.last_optimize_result()
-                
+
                 y_opt = f(x_opt, np.array([]))
 
                 # overwrite the current best if optimization succeeded
@@ -1378,7 +1382,7 @@ class DefaultChooser(object):
                     current_best_location = x_opt
             else:
                 logging.info('Optimizing current best with scipy l_BFGS')
-                
+
                 def f(x):
                     if x.ndim == 1:
                         x = x[None,:]
@@ -1387,7 +1391,7 @@ class DefaultChooser(object):
 
                 bounds = [(0.0,1.0)]*self.num_dims
 
-                x_opt, y_opt, opt_info = spo.fmin_l_bfgs_b(f, current_best_location.copy(), 
+                x_opt, y_opt, opt_info = spo.fmin_l_bfgs_b(f, current_best_location.copy(),
                                                            bounds=bounds, disp=0)
 
                 # make sure bounds were respected
@@ -1416,7 +1420,7 @@ class DefaultChooser(object):
 
         return unnormalized_best_value, current_best_location_orig_space
 
-    def best_constrained_no_solution(self):            
+    def best_constrained_no_solution(self):
 
         logging.info('\nNo feasible solution found (yet).\n')
 
@@ -1450,7 +1454,7 @@ class DefaultChooser(object):
                     else:
                         pv = total_constraint_confidence_over_hypers(self.constraint_models, x, compute_grad=False)
 
-                    return float(pv) 
+                    return float(pv)
 
                 opt.set_max_objective(f) # MAXIMIZE the probability
                 opt.set_xtol_abs(self.tolerance)
@@ -1473,7 +1477,7 @@ class DefaultChooser(object):
             else:
                 # Optimize with L_BFGS_B
                 logging.debug('Optimizing the current best with scipy l_BFGS.')
-                
+
                 def f(x):
                     if x.ndim == 1:
                         x = x[None,:]
@@ -1482,7 +1486,7 @@ class DefaultChooser(object):
 
                 bounds = [(0.0,1.0)]*self.num_dims
 
-                x_opt, y_opt, opt_info = spo.fmin_l_bfgs_b(f, best_probs_location.copy(), 
+                x_opt, y_opt, opt_info = spo.fmin_l_bfgs_b(f, best_probs_location.copy(),
                                                            bounds=bounds, disp=0)
                 y_opt = -y_opt # switch back to positive numbers
 
@@ -1524,14 +1528,14 @@ class DefaultChooser(object):
         best_ind = np.argmin(valid_mean)
         current_best_location = (self.grid[pc])[best_ind,:]
         current_best_value = np.min(valid_mean)
-        
+
         if self.options['optimize_best']:
             if nlopt_imported:
 
                 opt = nlopt.opt(self.nlopt_method, self.num_dims)
 
                 logging.info('Optimizing current best with NLopt, %s' % opt.get_algorithm_name())
-                
+
                 opt.set_lower_bounds(0.0)
                 opt.set_upper_bounds(1.0)
 
@@ -1573,9 +1577,9 @@ class DefaultChooser(object):
                             pv = constraint_confidence_over_hypers(self.models[constraint], x, compute_grad=False)
 
                         delta = self.tasks[constraint].options['delta']
-                        put_result_here[i] = float(1.0-delta-pv) 
+                        put_result_here[i] = float(1.0-delta-pv)
 
-                # the NLOPT constraint tolerance-- the amount by which it is ok for NLOPT to 
+                # the NLOPT constraint tolerance-- the amount by which it is ok for NLOPT to
                 # violate the constraints
                 tol = [self.tasks[constraint].options['constraint_tol'] for constraint in self.constraints]
                 opt.add_inequality_mconstraint(g, tol)
@@ -1593,10 +1597,10 @@ class DefaultChooser(object):
                     nlopt_constraints_results = np.zeros(self.numConstraints())
                     g(nlopt_constraints_results, x_opt, np.zeros(0))
                     # if np.all(nlopt_constraints_results<=tol):
-                    logging.debug('Optimizing improved the best by %f.' % self.objective.unstandardize_variance(current_best_value-y_opt))    
+                    logging.debug('Optimizing improved the best by %f.' % self.objective.unstandardize_variance(current_best_value-y_opt))
                     current_best_location = x_opt
                     # else:
-                    #     logging.debug('NLOPT violated %d constraint(s)--discarding.' % np.sum(nlopt_constraints_results>0)) 
+                    #     logging.debug('NLOPT violated %d constraint(s)--discarding.' % np.sum(nlopt_constraints_results>0))
                 else:
                     logging.debug('NLOPT did not improve the objective--discarding.')
 
@@ -1621,7 +1625,7 @@ class DefaultChooser(object):
                 def g(x):
                     if x.ndim == 1:
                         x = x[None]
-                    
+
                     g_func = np.zeros(self.numConstraints())
                     for i_g,constraint in enumerate(self.constraints):
                         pv = constraint_confidence_over_hypers(self.models[constraint], x, compute_grad=False)
@@ -1671,7 +1675,7 @@ class DefaultChooser(object):
         unnormalized_std_at_best = self.objective.unstandardize_variance(std_at_best) # not used -- not quite
 
         # right to report this -- i mean there is uncertainty in the constraints too
-        # this is the variance at that location, not the standard deviation of the minimum... 
+        # this is the variance at that location, not the standard deviation of the minimum...
         # not sure if this distinction is a big deal
 
         conf_string = ','.join(['%s:%.1f%%' % (constraint, 100.0*constraint_confidence_over_hypers(self.models[constraint], current_best_location, compute_grad=False)) for constraint in self.constraints])
@@ -1703,7 +1707,7 @@ class DefaultChooser(object):
         # with np.errstate(invalid='ignore'):
 
         # First: At what inputs "x" are all the constraints satisfied?
-        
+
         # If different tasks are evaluated at different inputs (descoupled scenario) then
         # this does not make sense and we return None here
         # (this is also why we have the obser_model type of recommendations)
@@ -1719,7 +1723,7 @@ class DefaultChooser(object):
             inps = self.objective.inputs
             vals = self.objective.values
             # get rid of those that violate constraints
-            vals[np.logical_not(all_constraints_satisfied)] = np.max(vals)            
+            vals[np.logical_not(all_constraints_satisfied)] = np.max(vals)
             # get rid of NaNs -- set them to biggest not-nan value, then they won't be the minimum
             vals[np.isnan(vals)] = np.max(vals[np.logical_not(np.isnan(vals))])
             best_observed_value = np.min(vals)
@@ -1774,7 +1778,7 @@ class DefaultChooser(object):
 
 
     def print_images(self):
-	
+
 	import matplotlib.pyplot as plt
         spacing = np.linspace(0,1,1000)[:,None]
 
@@ -1786,7 +1790,7 @@ class DefaultChooser(object):
 			inputs  = self.input_space.from_unit(self.models[ obj ].inputs)
 		else:
 			inputs_tmp  = self.input_space.from_unit(self.models[ obj ].inputs)
-			
+
 			for instance in inputs_tmp:
 #				if not instance in inputs:
 				if np.min(cdist(instance.reshape(1, len(instance)), inputs)) > 0:
@@ -1829,7 +1833,7 @@ class DefaultChooser(object):
 
 	plt.savefig('./figures/' + str(inputs.shape[ 0 ]) + '-posterior.pdf', format='pdf', dpi=1000)
 	plt.close(fig)
-	
+
 	fig = plt.figure()
 
 	n_task = 0
@@ -1868,7 +1872,7 @@ class DefaultChooser(object):
 	else:
 
 		from mpl_toolkits.mplot3d import Axes3D
-		
+
 		fig = plt.figure()
 		ax = fig.add_subplot(111, projection='3d')
 		ax.plot(mean[ tasks[ 0 ] ], mean[ tasks[ 1 ] ], mean[ tasks[ 2 ] ], c = 'red')
@@ -1881,7 +1885,7 @@ class DefaultChooser(object):
 
 
     def print_images_2d(self):
-	
+
 	import matplotlib.pyplot as plt
 	import matplotlib.cm as cm
 
@@ -1910,7 +1914,7 @@ class DefaultChooser(object):
 			inputs  = self.input_space.from_unit(self.models[ obj ].inputs)
 		else:
 			inputs_tmp  = self.input_space.from_unit(self.models[ obj ].inputs)
-			
+
 			for instance in inputs_tmp:
 #				if not instance in inputs:
 				if np.min(cdist(instance.reshape(1, len(instance)), inputs)) > 0:
@@ -1919,24 +1923,25 @@ class DefaultChooser(object):
 	n_total = inputs.shape[ 0 ]
 
 	task_couplings = {task_name : self.tasks[task_name].options["group"] for task_name in self.tasks}
-			
+
 	tasks = self.tasks.keys()
 
 	if len(set(task_couplings.values())) > 1:
 
 		for obj in tasks:
 			inputs  = self.input_space.from_unit(self.models[ obj ].inputs)
-	
+
 			acq_ap = function_over_hypers(self.models.values(), self.acq.acquisition,
 				self.objective_model_dict, self.constraint_models_dict,
 				spacing, 0, compute_grad=False, tasks=[ obj ])
-
+			acq_ap = acq_ap[:1024] # DF: Delete this line
 			fig = plt.figure()
-			plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None')
-#			im = plt.imshow(acq_ap.reshape((size, size)).T, interpolation = 'bilinear', origin = 'lower', 
+			plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None', label="inputs")
+#			im = plt.imshow(acq_ap.reshape((size, size)).T, interpolation = 'bilinear', origin = 'lower',
 #				cmap = cm.gray, extent = (0, 1, 0, 1))
-			CS = plt.contour(X, Y, acq_ap.reshape((size, size)).T)
+			CS = plt.contour(X, Y, acq_ap.reshape((size, size)).T) # 1
 			plt.clabel(CS, inline=1, fontsize=10)
+			plt.legend(loc="upper left")
 			plt.savefig('./figures/' + str(n_total) + '-' + obj + '-acq.pdf', format='pdf', dpi=1000)
 			plt.close(fig)
 
@@ -1948,12 +1953,12 @@ class DefaultChooser(object):
 				inputs  = self.input_space.from_unit(self.models[ obj ].inputs)
 			else:
 				inputs_tmp  = self.input_space.from_unit(self.models[ obj ].inputs)
-				
+
 				for instance in inputs_tmp:
 #					if not instance in inputs:
 					if np.min(cdist(instance.reshape(1, len(instance)), inputs)) > 0:
 						inputs = np.vstack((inputs, instance))
-
+		# import pdb; pdb.set_trace()
 		acq_ap = function_over_hypers(self.models.values(), self.acq.acquisition,
 			self.objective_model_dict, self.constraint_models_dict,
 			spacing, (self.stored_recommendation['model_model_value'] - \
@@ -1962,12 +1967,17 @@ class DefaultChooser(object):
 
                 if not np.all(acq_ap == 0):
 		    fig = plt.figure()
-		    plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None')
+		    plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None', label="inputs")
 #		    im = plt.imshow(acq_ap.reshape((size, size)).T, interpolation = 'bilinear', origin = 'lower', cmap = cm.gray, extent = (0, 1, 0, 1))
-		    CS = plt.contour(X, Y, acq_ap.reshape((size, size)).T)
+                    ret = self.acq.acquisition(self.objective_model_dict, self.constraint_models_dict, spacing, (self.stored_recommendation['model_model_value'] - self.objective.standardization_mean) / self.objective.standardization_variance, compute_grad=False, tasks=tasks, tasks_values = self.tasks).shape
+		    acq_ap = acq_ap[:1024]
+		    CS = plt.contour(X, Y, acq_ap.reshape((size, size)).T) # 2
 	    	    plt.clabel(CS, inline=True, fontsize=10)
+		    plt.legend(loc="upper left")
 		    plt.savefig('./figures/' + str(n_total) + '-acq.pdf', format='pdf', dpi=1000)
 		    plt.close(fig)
+
+	
 
 	mean = dict()
 	var = dict()
@@ -1988,34 +1998,35 @@ class DefaultChooser(object):
                 if not np.all(mean[ key ] == mean[ key ][ 0 ]):
 		    inputs  = self.input_space.from_unit(self.models[ key ].inputs)
 		    fig = plt.figure()
-		    plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None')
+		    plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None', label="inputs")
 #		    im = plt.imshow(mean[ key ].reshape((size, size)).T, interpolation = 'bilinear', origin = 'lower', \
 #			cmap = cm.gray, extent = (0, 1, 0, 1))
 		    CS = plt.contour(X, Y, mean[ key ].reshape((size, size)).T)
 		    plt.clabel(CS, inline=1, fontsize=10)
                     if len(set(task_couplings.values())) == 1:
-         	            plt.plot(self.stored_recommendation['model_model_input'][0 ], self.stored_recommendation['model_model_input'][1], \
-        			'black', marker = 'o', linestyle = 'None')
+         	            plt.plot(self.stored_recommendation['model_model_input'][0, 0 ], self.stored_recommendation['model_model_input'][0,1], \
+        			'black', marker = 'o', linestyle = 'None', label="recomendation")
                     else:
                             plt.plot(self.stored_recommendation['model_model_input'][:,0 ], self.stored_recommendation['model_model_input'][:,1], \
-        			'black', marker = 'o', linestyle = 'None')
+        			'black', marker = 'o', linestyle = 'None', label="recomendations")
 
 		    plt.savefig('./figures/' + str(n_total) + '-' + key + '-mean.pdf', format='pdf', dpi=1000)
 		    plt.close(fig)
                 if not np.all(var[ key ] == var[ key ][ 0 ]):
 		    fig = plt.figure()
-		    plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None')
+		    plt.plot(inputs[ :, 0 ], inputs[ :, 1 ], color='blue', marker='x', markersize=10, linestyle='None', label="inputs")
 #		    im = plt.imshow(var[ key ].reshape((size, size)).T, interpolation = 'bilinear', origin = 'lower', \
 #	    		cmap = cm.gray, extent = (0, 1, 0, 1))
 		    CS = plt.contour(X, Y, var[ key ].reshape((size, size)).T)
 		    plt.clabel(CS, inline=1, fontsize=10)
 
                     if len(set(task_couplings.values())) == 1:
-        	            plt.plot(self.stored_recommendation['model_model_input'][ 0 ], self.stored_recommendation['model_model_input'][ 1 ], \
-        	    		'black', marker = 'o', linestyle = 'None')
+        	            plt.plot(self.stored_recommendation['model_model_input'][ 0,0 ], self.stored_recommendation['model_model_input'][ 0,1 ], \
+        	    		'black', marker = 'o', linestyle = 'None', label="recomendation")
                     else:
         	            plt.plot(self.stored_recommendation['model_model_input'][:, 0 ], self.stored_recommendation['model_model_input'][:, 1], \
-        	    		'black', marker = 'o', linestyle = 'None')
+        	    		'black', marker = 'o', linestyle = 'None', label="recomendations")
+		    plt.legend(loc="upper left")
 		    plt.savefig('./figures/' + str(n_total) + '-' + key + '-var.pdf', format='pdf', dpi=1000)
 		    plt.close(fig)
 
@@ -2026,15 +2037,16 @@ class DefaultChooser(object):
 		plt.plot(mean[ objectives[ 0 ] ], mean[ objectives[ 1 ] ], color = 'red', marker = 'x', markersize = 2, linestyle = 'None')
 
 		plt.plot(self.stored_recommendation['model_model_value'][ :, 0 ], self.stored_recommendation['model_model_value'][ :, 1 ], \
-			'b.', marker = 'x', markersize = 3, linestyle = 'None')
+			'b.', marker = 'x', markersize = 3, linestyle = 'None', label="recomendation")
 
+		plt.legend(loc="upper left")
 		plt.savefig('./figures/' + str(n_total) + '-frontier.pdf', format='pdf', dpi=1000)
 		plt.close(fig)
 
 	elif len(tasks) > 2:
 
 		from mpl_toolkits.mplot3d import Axes3D
-		
+
 		fig = plt.figure()
 		ax = fig.add_subplot(111, projection='3d')
 		ax.scatter(mean[ objectives[ 0 ] ], mean[ objectives[ 1 ] ], mean[ objectives[ 2 ] ], c = 'red', marker = 'o', alpha = 0.1)
@@ -2042,6 +2054,7 @@ class DefaultChooser(object):
 			self.stored_recommendation['model_model_value'][:,1], \
 			self.stored_recommendation['model_model_value'][:,2], c = 'blue', marker ='x')
 		ax.view_init(30, -135)
+		plt.legend(loc="upper left")
 		plt.savefig('./figures/' + str(n_total) + '-frontier.pdf', format='pdf', dpi=1000)
 		plt.close(fig)
 
@@ -2127,7 +2140,7 @@ class DefaultChooser(object):
                 plt.close(fig)
 
     def print_images_2d_random(self):
-	
+
 	import matplotlib.pyplot as plt
 	import matplotlib.cm as cm
 
@@ -2154,7 +2167,7 @@ class DefaultChooser(object):
 			inputs  = self.input_space.from_unit(self.models[ obj ].inputs)
 		else:
 			inputs_tmp  = self.input_space.from_unit(self.models[ obj ].inputs)
-			
+
 			for instance in inputs_tmp:
 #				if not instance in inputs:
 				if np.min(cdist(instance.reshape(1, len(instance)), inputs)) > 0:
@@ -2163,7 +2176,7 @@ class DefaultChooser(object):
 	n_total = inputs.shape[ 0 ]
 
 	task_couplings = {task_name : self.tasks[task_name].options["group"] for task_name in self.tasks}
-			
+
 	tasks = self.tasks.keys()
 
 	mean = dict()
@@ -2217,7 +2230,7 @@ class DefaultChooser(object):
 	#else:
 
 		#from mpl_toolkits.mplot3d import Axes3D
-		
+
 		#fig = plt.figure()
 		#ax = fig.add_subplot(111, projection='3d')
 		#ax.scatter(mean[ objectives[ 0 ] ], mean[ objectives[ 1 ] ], mean[ objectives[ 2 ] ], c = 'red', marker = 'o', alpha = 0.1)
@@ -2227,4 +2240,3 @@ class DefaultChooser(object):
 		#ax.view_init(30, -135)
 		#plt.savefig('./figures/' + str(n_total) + '-frontier.pdf', format='pdf', dpi=1000)
 		#plt.close(fig)
-

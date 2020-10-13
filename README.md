@@ -7,9 +7,9 @@ Spearmint is a software package to perform Bayesian optimization. The Software i
 Spearmint is under an **Academic and Non-Commercial Research Use License**.  Before using spearmint please be aware of the [license](LICENSE.md).  If you do not qualify to use spearmint you can ask to obtain a license as detailed in the [license](LICENSE.md) or you can use the older open source code version (which is somewhat outdated) at https://github.com/JasperSnoek/spearmint.  
 
 ## IMPORTANT: You are off the main branch!
-This is the PESMOC, Integer-Categorical and Case Conditional branch. This branch contains the Predictive Entropy Search for Multiobjective Optimization for Constraints and Dealing with Integer and Categorical Valued Variables in Bayesian Optimization. 
+This is the MESMOC branch. Thus, this branch contains the Max-value Entropy Search for Multiobjective Optimization for Constraints. Since this branch is a fork of https://github.com/EduardoGarrido90/Spearmint branch, it also include PESMOC, Integer-Categorical and Case Conditional.
 
-####Relevant Publications
+#### Relevant Publications
 
 Spearmint implements a combination of the algorithms detailed in the following publications:
 
@@ -27,7 +27,7 @@ Spearmint implements a combination of the algorithms detailed in the following p
 
     Bayesian Optimization and Semiparametric Models with Applications to Assistive Technology  
     Jasper Snoek, PhD Thesis, University of Toronto, 2013  
-  
+
     Bayesian Optimization with Unknown Constraints
     Michael Gelbart, Jasper Snoek and Ryan Prescott Adams
     Uncertainty in Artificial Intelligence, 2014
@@ -36,13 +36,13 @@ Spearmint implements a combination of the algorithms detailed in the following p
     Daniel Hernandez-Lobato, Jose Miguel Hernandez-Lobato, Amar Shah and Ryan Prescott Adams
     NIPS workshop on Bayesian optimization, 2015
 
-This branch also includes the method in 
-
     Dealing with Categorical and Integer-valued Variables in Bayesian Optimization with Gaussian Processes
-    EC Garrido-Merchán, D Hernández-Lobato - arXiv preprint arXiv:1805.03463, 2018
-    
+    EC Garrido-Merchán, D Hernández-Lobato
+    Neurocomputing, 2020
+
     Predictive Entropy Search for Multi-objective Bayesian Optimization with Constraints
-    EC Garrido-Merchán, D Hernández-Lobato - arXiv preprint arXiv:1609.01051, 2016
+    EC Garrido-Merchán, D Hernández-Lobato
+    Neurocomputing, 2019
 
 ### STEP 1: Installation
 1. Download/clone the spearmint code
@@ -54,7 +54,7 @@ This branch also includes the method in
 
 ### STEP 2: Setting up your experiment
 1. Create a callable objective function. See ../examples/moo/branin.py as an example.
-2. Create a config file. See ../examples/moo/config.json as an example. Here you will see that we specify the PESM acquisition function. Other alternatives are PESMC, ParEGO, EHI, SMSego and SUR.
+2. Create a config file. See ../examples/moo/config.json as an example. Here you will see that we specify the PESM acquisition function. Other alternatives are MESMC, PESMC, ParEGO, EHI, SMSego and SUR.
 
 ### STEP 3: Running spearmint
 1. Start up a MongoDB daemon instance: mongod --fork --logpath \<path/to/logfile\> --dbpath \<path/to/dbfolder\>
@@ -71,9 +71,9 @@ perforamnce metrics, e.g., using the hypervolume.
 If you want to delete all data associated with an experiment (output files, plots, database entries), run "python cleanup.py \</path/to/experiment/directory\>"
 
 #### (optional) Running multiple experiments at once
-You can start multiple experiments at once using "python run_experiments.py \</path/to/experiment/directory\> N" where N is the number of experiments to run. You can clean them up at once with "python cleanup_experiments.py \</path/to/experiment/directory\> N". 
+You can start multiple experiments at once using "python run_experiments.py \</path/to/experiment/directory\> N" where N is the number of experiments to run. You can clean them up at once with "python cleanup_experiments.py \</path/to/experiment/directory\> N".
 
-#### (optional) NLopt install instructions, without needing admin privileges 
+#### (optional) NLopt install instructions, without needing admin privileges
 1. wget http://ab-initio.mit.edu/nlopt/nlopt-2.4.2.tar.gz
 2. tar -zxvf nlopt-2.4.2.tar.gz
 3. cd nlopt-2.4.2
@@ -84,8 +84,5 @@ You can start multiple experiments at once using "python run_experiments.py \</p
 8. export PYTHONPATH=PATH/TO/YOUR/NLOPT/nlopt-2.4.2/build/lib/python2.7/site-packages/:$PYTHONPATH
 9. (you can add line 8 to a .bashrc or equivalent file)
 
-#### Examples of Predictive Entropy Search for Multiobjective with Constraints
-An example of the use of PESMOC in Spearmint can be found in examples/moocon. The python wrapper file just retrieves the value of the objectives and constraints with a dictionary and in the json these black boxes can be specified by tasks.
-
-#### Example of the Integer and Categorical Transformation.
-These transformations can be speficied in the config.json file of the experiment and need to be parsed in the wrapper.py file as it is shown in the example examples/integer_categorical. It is important to specify as range of the integer variable in the config.json file not the actual range of the variable but [0,1]. The actual range is specified in the wrapper as wrapper.py states.
+#### Examples of Max-value Entropy Search for Multiobjective with Constraints
+An example of the use of MESMOC in Spearmint can be found in examples/moocon_mesmoc. The python wrapper file just retrieves the value of the objectives and constraints with a dictionary and in the json these black boxes can be specified by tasks.

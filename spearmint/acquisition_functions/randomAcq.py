@@ -192,7 +192,4 @@ class RANDOM(AbstractAcquisitionFunction):
 
 	def acquisition(self, obj_model_dict, con_models_dict, cand, current_best, compute_grad, minimize=True, tasks=None, tasks_values=None):
 
-		return 0.0 
-
-
-
+		return 0.0
